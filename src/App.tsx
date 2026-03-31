@@ -32,7 +32,12 @@ import {
   RefreshCcw,
   Info,
   Trophy,
-  Mail
+  Mail,
+  EyeOff,
+  Eye,
+  UserX,
+  UserCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
@@ -88,7 +93,11 @@ interface UserProfile {
   photoURL: string | null;
   totalOwned: number;
   totalDuplicates: number;
+  hidden?: boolean;
+  banned?: boolean;
 }
+
+const ADMIN_EMAIL = 'belmonte.matheus@gmail.com';
 
 enum OperationType {
   CREATE = 'create',
@@ -789,6 +798,7 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [tradeTarget, setTradeTarget] = useState<UserProfile | null>(null);
+  const isAdmin = currentUser.email === ADMIN_EMAIL;
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -802,16 +812,41 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
     fetchUsers();
   }, []);
 
+  const toggleHidden = async (u: UserProfile) => {
+    const userRef = doc(db, 'users', u.uid);
+    await updateDoc(userRef, { hidden: !u.hidden });
+    setUsers(prev => prev.map(p => p.uid === u.uid ? { ...p, hidden: !p.hidden } : p));
+    toast.success(u.hidden ? `${u.displayName} visível no ranking.` : `${u.displayName} ocultado do ranking.`);
+  };
+
+  const toggleBan = async (u: UserProfile) => {
+    const action = u.banned ? 'desbanir' : 'banir';
+    if (!window.confirm(`Deseja ${action} ${u.displayName} (${u.email})?`)) return;
+    const userRef = doc(db, 'users', u.uid);
+    await updateDoc(userRef, { banned: !u.banned });
+    setUsers(prev => prev.map(p => p.uid === u.uid ? { ...p, banned: !p.banned } : p));
+    toast.success(u.banned ? `${u.displayName} foi desbanido.` : `${u.displayName} foi banido.`);
+  };
+
   if (loading) {
     return <div className="text-center py-16 text-white/40 text-sm">Carregando ranking...</div>;
   }
 
-  if (users.length === 0) {
+  const displayUsers = isAdmin ? users : users.filter(u => !u.hidden && !u.banned);
+
+  if (displayUsers.length === 0) {
     return <div className="text-center py-16 text-white/40 text-sm">Nenhum participante ainda.</div>;
   }
 
+  let rankPosition = 0;
+
   return (
     <>
+      {isAdmin && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-xs font-bold">
+          <ShieldAlert size={14} /> Modo Admin — você vê todos os usuários, incluindo ocultos e banidos.
+        </div>
+      )}
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-sm">
           <thead>
@@ -826,22 +861,31 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
             </tr>
           </thead>
           <tbody>
-            {users.map((u, i) => {
+            {displayUsers.map((u) => {
               const progress = ((u.totalOwned / TOTAL_STICKERS) * 100).toFixed(1);
               const missing = TOTAL_STICKERS - u.totalOwned;
               const isMe = u.uid === currentUser.uid;
+              if (!u.hidden && !u.banned) rankPosition++;
+              const pos = (!u.hidden && !u.banned) ? rankPosition : null;
               return (
-                <tr key={u.uid} className={`border-b border-white/5 transition-colors ${isMe ? 'bg-football-green/5' : 'hover:bg-white/[0.02]'}`}>
+                <tr key={u.uid} className={`border-b border-white/5 transition-colors
+                  ${isMe ? 'bg-football-green/5' : ''}
+                  ${u.banned ? 'opacity-40' : ''}
+                  ${u.hidden && !u.banned ? 'opacity-60' : ''}
+                  ${!isMe && !u.banned ? 'hover:bg-white/[0.02]' : ''}
+                `}>
                   <td className="p-4 text-white/40 font-bold">
-                    {i === 0 ? <Trophy size={16} className="text-gold" /> : i + 1}
+                    {pos === 1 ? <Trophy size={16} className="text-gold" /> : pos ?? '—'}
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       {u.photoURL && <img src={u.photoURL} className="w-7 h-7 rounded-full border border-white/10" referrerPolicy="no-referrer" alt="" />}
-                      <span className="font-semibold">
-                        {u.displayName}
-                        {isMe && <span className="ml-2 text-[10px] text-football-green font-bold uppercase tracking-widest">você</span>}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold">{u.displayName}</span>
+                        {isMe && <span className="text-[10px] text-football-green font-bold uppercase tracking-widest">você</span>}
+                        {isAdmin && u.hidden && <span className="text-[10px] text-white/30 font-bold uppercase tracking-widest flex items-center gap-0.5"><EyeOff size={10} /> oculto</span>}
+                        {isAdmin && u.banned && <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest flex items-center gap-0.5"><UserX size={10} /> banido</span>}
+                      </div>
                     </div>
                   </td>
                   <td className="p-4 text-center font-bold">{u.totalOwned}</td>
@@ -855,15 +899,35 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
                       <span className="text-football-green font-bold text-xs w-12">{progress}%</span>
                     </div>
                   </td>
-                  <td className="p-4 text-center">
-                    {!isMe && (
-                      <button
-                        onClick={() => setTradeTarget(u)}
-                        className="bg-white/5 hover:bg-football-green/20 border border-white/10 hover:border-football-green/40 text-white/60 hover:text-football-green text-xs font-bold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
-                      >
-                        Sugerir troca
-                      </button>
-                    )}
+                  <td className="p-4">
+                    <div className="flex items-center justify-end gap-2">
+                      {!isMe && !u.banned && (
+                        <button
+                          onClick={() => setTradeTarget(u)}
+                          className="bg-white/5 hover:bg-football-green/20 border border-white/10 hover:border-football-green/40 text-white/60 hover:text-football-green text-xs font-bold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
+                        >
+                          Sugerir troca
+                        </button>
+                      )}
+                      {isAdmin && !isMe && (
+                        <div className="flex items-center gap-1 ml-1">
+                          <button
+                            onClick={() => toggleHidden(u)}
+                            title={u.hidden ? 'Mostrar no ranking' : 'Ocultar do ranking'}
+                            className="p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-all"
+                          >
+                            {u.hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                          </button>
+                          <button
+                            onClick={() => toggleBan(u)}
+                            title={u.banned ? 'Desbanir usuário' : 'Banir usuário'}
+                            className={`p-1.5 rounded-lg transition-all ${u.banned ? 'text-green-400 hover:bg-green-400/10' : 'text-white/30 hover:text-red-400 hover:bg-red-400/10'}`}
+                          >
+                            {u.banned ? <UserCheck size={14} /> : <UserX size={14} />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -896,7 +960,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        const userRef = doc(db, 'users', u.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists() && snap.data().banned) {
+          await signOut(auth);
+          setError('Sua conta foi banida desta plataforma.');
+          setIsAuthReady(true);
+          return;
+        }
+      }
       setUser(u);
       setIsAuthReady(true);
     });

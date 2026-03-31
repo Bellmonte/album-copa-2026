@@ -58,7 +58,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data)) ||
+                       (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden', 'banned']));
     }
   }
 }
