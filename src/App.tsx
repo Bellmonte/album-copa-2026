@@ -200,7 +200,12 @@ const SectionWrapper = ({ children, id, className = "" }: { children: React.Reac
   );
 };
 
-const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) => void }) => {
+const Navbar = ({ user, onError, activePage, onNavigate }: {
+  user: User | null;
+  onError: (err: string) => void;
+  activePage: 'home' | 'ranking';
+  onNavigate: (page: 'home' | 'ranking') => void;
+}) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -226,16 +231,15 @@ const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) =
 
   const handleLogout = () => signOut(auth);
 
-  const navLinks = [
+  const homeLinks = [
     { name: 'Meu Álbum', href: '#album' },
-    { name: 'Ranking', href: '#ranking' },
     { name: 'Alfredo Chat', href: '#chat' },
   ];
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-dark-bg/90 backdrop-blur-md border-b border-white/10 py-3' : 'bg-transparent py-5'}`}>
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('home')}>
           <div className="w-10 h-10 bg-football-green rounded-xl flex items-center justify-center shadow-lg shadow-football-green/20">
             <Bot className="text-white w-6 h-6" />
           </div>
@@ -244,11 +248,19 @@ const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) =
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
+          {user && activePage === 'home' && homeLinks.map((link) => (
             <a key={link.name} href={link.href} className="text-sm font-medium text-white/70 hover:text-football-green transition-colors">
               {link.name}
             </a>
           ))}
+          {user && (
+            <button
+              onClick={() => onNavigate(activePage === 'ranking' ? 'home' : 'ranking')}
+              className={`text-sm font-medium transition-colors ${activePage === 'ranking' ? 'text-football-green' : 'text-white/70 hover:text-football-green'}`}
+            >
+              {activePage === 'ranking' ? '← Voltar' : 'Ranking'}
+            </button>
+          )}
           {user ? (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -260,8 +272,8 @@ const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) =
               </button>
             </div>
           ) : (
-            <button 
-              onClick={handleLogin} 
+            <button
+              onClick={handleLogin}
               disabled={isLoggingIn}
               className="bg-whatsapp-green hover:bg-whatsapp-green/90 disabled:opacity-50 text-dark-bg font-bold py-2 px-6 rounded-full text-sm transition-all flex items-center gap-2"
             >
@@ -286,16 +298,24 @@ const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) =
             className="md:hidden bg-dark-bg border-b border-white/10 overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4">
-              {navLinks.map((link) => (
-                <a 
-                  key={link.name} 
-                  href={link.href} 
+              {user && activePage === 'home' && homeLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="text-lg font-medium text-white/70"
                 >
                   {link.name}
                 </a>
               ))}
+              {user && (
+                <button
+                  onClick={() => { onNavigate(activePage === 'ranking' ? 'home' : 'ranking'); setIsMobileMenuOpen(false); }}
+                  className="text-left text-lg font-medium text-football-green"
+                >
+                  {activePage === 'ranking' ? '← Voltar' : 'Ranking'}
+                </button>
+              )}
               {user ? (
                 <button onClick={handleLogout} className="text-left text-lg font-medium text-red-400 flex items-center gap-2">
                   <LogOut size={20} /> Sair
@@ -868,6 +888,12 @@ export default function App() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<'home' | 'ranking'>('home');
+
+  const handleNavigate = (page: 'home' | 'ranking') => {
+    setActivePage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -1035,7 +1061,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen selection:bg-football-green/30">
-      <Navbar user={user} onError={setError} />
+      <Navbar user={user} onError={setError} activePage={activePage} onNavigate={handleNavigate} />
       <ErrorBoundary error={error} />
       <Toaster position="top-center" richColors theme="dark" />
 
@@ -1100,7 +1126,7 @@ export default function App() {
                 </div>
               </div>
               <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${stats.progress}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
@@ -1110,40 +1136,74 @@ export default function App() {
             </div>
           </div>
 
-          {/* CHAT SECTION */}
-          <SectionWrapper id="chat">
-            <div className="max-w-7xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-3xl font-bold mb-2">Fale com o Alfredo</h2>
-                <p className="text-white/60 text-sm">Mande números, fotos ou pergunte o que trocar.</p>
-              </div>
-              <AlfredoChat user={user} stickers={stickers} onUpdateBatch={updateBatch} />
-            </div>
-          </SectionWrapper>
+          <AnimatePresence mode="wait">
+            {activePage === 'ranking' ? (
+              <motion.div
+                key="ranking"
+                initial={{ opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 40 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-screen py-16 px-6"
+              >
+                <div className="max-w-7xl mx-auto">
+                  <div className="mb-8 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-3xl font-bold flex items-center gap-3">
+                        <Trophy className="text-gold" size={28} /> Ranking
+                      </h2>
+                      <p className="text-white/60 text-sm mt-1">Progresso de todos os participantes.</p>
+                    </div>
+                    <button
+                      onClick={() => handleNavigate('home')}
+                      className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors border border-white/10 hover:border-white/30 px-4 py-2 rounded-xl"
+                    >
+                      ← Voltar
+                    </button>
+                  </div>
+                  <RankingTab currentUser={user} currentUserStickers={stickers} />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="home"
+                initial={{ opacity: 0, x: -40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                transition={{ duration: 0.3 }}
+              >
+                {/* CHAT SECTION */}
+                <SectionWrapper id="chat">
+                  <div className="max-w-7xl mx-auto">
+                    <div className="mb-8">
+                      <h2 className="text-3xl font-bold mb-2">Fale com o Alfredo</h2>
+                      <p className="text-white/60 text-sm">Mande números, fotos ou pergunte o que trocar.</p>
+                    </div>
+                    <AlfredoChat user={user} stickers={stickers} onUpdateBatch={updateBatch} />
+                  </div>
+                </SectionWrapper>
 
-          {/* RANKING SECTION */}
-          <SectionWrapper id="ranking">
-            <div className="max-w-7xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                  <Trophy className="text-gold" size={28} /> Ranking
-                </h2>
-                <p className="text-white/60 text-sm">Progresso de todos os participantes. Clique em "Sugerir troca" para ver o que você pode trocar com cada um.</p>
-              </div>
-              <RankingTab currentUser={user} currentUserStickers={stickers} />
-            </div>
-          </SectionWrapper>
-
-          {/* ALBUM SECTION */}
-          <SectionWrapper id="album" className="bg-white/[0.02]">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-12">
-                <h2 className="text-3xl font-bold">Meu Álbum</h2>
-                <div className="text-xs font-bold text-white/30 uppercase tracking-widest">Clique para adicionar · Botão direito para remover</div>
-              </div>
-              <StickerGrid stickers={stickers} onUpdate={updateSticker} />
-            </div>
-          </SectionWrapper>
+                {/* ALBUM SECTION */}
+                <SectionWrapper id="album" className="bg-white/[0.02]">
+                  <div className="max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-12">
+                      <h2 className="text-3xl font-bold">Meu Álbum</h2>
+                      <div className="flex items-center gap-6">
+                        <button
+                          onClick={() => handleNavigate('ranking')}
+                          className="flex items-center gap-2 text-xs font-bold text-white/40 hover:text-football-green transition-colors uppercase tracking-widest"
+                        >
+                          <Trophy size={14} /> Ver Ranking
+                        </button>
+                        <div className="text-xs font-bold text-white/30 uppercase tracking-widest hidden sm:block">Clique para adicionar · Botão direito para remover</div>
+                      </div>
+                    </div>
+                    <StickerGrid stickers={stickers} onUpdate={updateSticker} />
+                  </div>
+                </SectionWrapper>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       ) : null}
 
