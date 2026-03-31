@@ -48,7 +48,7 @@ service cloud.firestore {
     // Match Rules
     // ===============================================================
     match /stickers/{stickerId} {
-      allow read: if isDocOwner() || isAdmin();
+      allow read: if (resource == null && isAuthenticated()) || isDocOwner() || isAdmin();
       allow create: if isAuthenticated() && isValidSticker(request.resource.data);
       allow update: if isDocOwner() && isValidSticker(request.resource.data) && 
                       request.resource.data.uid == resource.data.uid;
