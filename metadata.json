@@ -1,0 +1,5 @@
+{
+  "name": "Alfredo - Assistente de Figurinhas",
+  "description": "Seu assistente inteligente para o álbum da Copa do Mundo 2026. Gestão via Google Sheets, OCR e NLP.",
+  "requestFramePermissions": []
+}
