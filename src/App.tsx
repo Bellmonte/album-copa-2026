@@ -392,14 +392,14 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
                 key={n}
                 onClick={() => onUpdate(n, 1)}
                 onContextMenu={(e) => { e.preventDefault(); onUpdate(n, -1); }}
-                className={`aspect-square flex items-center justify-center text-[8px] font-bold rounded-sm transition-all relative group
+                className={`aspect-square flex items-center justify-center text-[10px] font-bold rounded-sm transition-all relative group
                   ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/20 hover:bg-white/10'}
                   ${count > 1 ? 'ring-1 ring-gold' : ''}
                 `}
               >
                 {n}
                 {count > 1 && (
-                  <span className="absolute -top-1 -right-1 bg-gold text-dark-bg text-[7px] w-2.5 h-2.5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-gold text-dark-bg text-[9px] w-2.5 h-2.5 rounded-full flex items-center justify-center">
                     {count - 1}
                   </span>
                 )}
