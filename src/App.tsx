@@ -30,7 +30,9 @@ import {
   AlertCircle,
   Trash2,
   RefreshCcw,
-  Info
+  Info,
+  Trophy,
+  Mail
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
@@ -44,15 +46,16 @@ import {
   User
 } from 'firebase/auth';
 import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   getDoc,
+  getDocs,
   serverTimestamp,
   Timestamp,
   writeBatch
@@ -76,6 +79,15 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+}
+
+interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string | null;
+  totalOwned: number;
+  totalDuplicates: number;
 }
 
 enum OperationType {
@@ -216,6 +228,7 @@ const Navbar = ({ user, onError }: { user: User | null, onError: (err: string) =
 
   const navLinks = [
     { name: 'Meu Álbum', href: '#album' },
+    { name: 'Ranking', href: '#ranking' },
     { name: 'Alfredo Chat', href: '#chat' },
   ];
 
@@ -433,6 +446,94 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
           })}
         </div>
       )}
+    </div>
+  );
+};
+
+const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
+  currentUserStickers: Sticker[];
+  otherUser: UserProfile;
+  onClose: () => void;
+}) => {
+  const [theirStickers, setTheirStickers] = useState<Sticker[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStickers = async () => {
+      const q = query(collection(db, 'stickers'), where('uid', '==', otherUser.uid));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Sticker));
+      setTheirStickers(data);
+      setLoading(false);
+    };
+    fetchStickers();
+  }, [otherUser.uid]);
+
+  const { iCanGive, theyCanGive } = useMemo(() => {
+    const myDuplicates = currentUserStickers.filter(s => s.count > 1).map(s => s.number);
+    const theirOwnedSet = new Set(theirStickers.map(s => s.number));
+    const myOwnedSet = new Set(currentUserStickers.map(s => s.number));
+    const theirDuplicates = theirStickers.filter(s => s.count > 1).map(s => s.number);
+    return {
+      iCanGive: myDuplicates.filter(n => !theirOwnedSet.has(n)),
+      theyCanGive: theirDuplicates.filter(n => !myOwnedSet.has(n)),
+    };
+  }, [currentUserStickers, theirStickers]);
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="p-6 border-b border-white/10 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold">Sugestão de troca</h3>
+            <p className="text-white/50 text-sm mt-0.5">com {otherUser.displayName}</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors"><X size={20} /></button>
+        </div>
+
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-2 text-sm text-white/60">
+            <Mail size={14} />
+            <span>Contato: </span>
+            <a href={`mailto:${otherUser.email}`} className="text-football-green hover:underline font-medium">{otherUser.email}</a>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-white/40 text-sm">Calculando sugestões...</div>
+        ) : (
+          <div className="p-6 grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest text-football-green mb-3 flex items-center gap-1.5">
+                <Plus size={12} /> Você pode dar ({iCanGive.length})
+              </div>
+              {iCanGive.length === 0 ? (
+                <p className="text-white/30 text-xs">Nenhuma repetida que ele(a) precisa.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {iCanGive.map(n => (
+                    <span key={n} className="bg-football-green/20 text-football-green text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest text-gold mb-3 flex items-center gap-1.5">
+                <Plus size={12} /> Você pode receber ({theyCanGive.length})
+              </div>
+              {theyCanGive.length === 0 ? (
+                <p className="text-white/30 text-xs">Ele(a) não tem repetidas que você precisa.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {theyCanGive.map(n => (
+                    <span key={n} className="bg-gold/20 text-gold text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -661,6 +762,107 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
   );
 };
 
+const RankingTab = ({ currentUser, currentUserStickers }: {
+  currentUser: User;
+  currentUserStickers: Sticker[];
+}) => {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tradeTarget, setTradeTarget] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const snapshot = await getDocs(collection(db, 'users'));
+      const data = snapshot.docs
+        .map(d => d.data() as UserProfile)
+        .sort((a, b) => b.totalOwned - a.totalOwned);
+      setUsers(data);
+      setLoading(false);
+    };
+    fetchUsers();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center py-16 text-white/40 text-sm">Carregando ranking...</div>;
+  }
+
+  if (users.length === 0) {
+    return <div className="text-center py-16 text-white/40 text-sm">Nenhum participante ainda.</div>;
+  }
+
+  return (
+    <>
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-white/40 text-xs uppercase tracking-widest">
+              <th className="text-left p-4 font-bold">#</th>
+              <th className="text-left p-4 font-bold">Participante</th>
+              <th className="text-center p-4 font-bold">Coladas</th>
+              <th className="text-center p-4 font-bold">Faltam</th>
+              <th className="text-center p-4 font-bold">Repetidas</th>
+              <th className="text-center p-4 font-bold">Progresso</th>
+              <th className="text-center p-4 font-bold"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u, i) => {
+              const progress = ((u.totalOwned / TOTAL_STICKERS) * 100).toFixed(1);
+              const missing = TOTAL_STICKERS - u.totalOwned;
+              const isMe = u.uid === currentUser.uid;
+              return (
+                <tr key={u.uid} className={`border-b border-white/5 transition-colors ${isMe ? 'bg-football-green/5' : 'hover:bg-white/[0.02]'}`}>
+                  <td className="p-4 text-white/40 font-bold">
+                    {i === 0 ? <Trophy size={16} className="text-gold" /> : i + 1}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      {u.photoURL && <img src={u.photoURL} className="w-7 h-7 rounded-full border border-white/10" referrerPolicy="no-referrer" alt="" />}
+                      <span className="font-semibold">
+                        {u.displayName}
+                        {isMe && <span className="ml-2 text-[10px] text-football-green font-bold uppercase tracking-widest">você</span>}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-center font-bold">{u.totalOwned}</td>
+                  <td className="p-4 text-center text-red-400 font-bold">{missing}</td>
+                  <td className="p-4 text-center text-gold font-bold">{u.totalDuplicates}</td>
+                  <td className="p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-football-green rounded-full" style={{ width: `${progress}%` }} />
+                      </div>
+                      <span className="text-football-green font-bold text-xs w-12">{progress}%</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-center">
+                    {!isMe && (
+                      <button
+                        onClick={() => setTradeTarget(u)}
+                        className="bg-white/5 hover:bg-football-green/20 border border-white/10 hover:border-football-green/40 text-white/60 hover:text-football-green text-xs font-bold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
+                      >
+                        Sugerir troca
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {tradeTarget && (
+        <TradeModal
+          currentUserStickers={currentUserStickers}
+          otherUser={tradeTarget}
+          onClose={() => setTradeTarget(null)}
+        />
+      )}
+    </>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [stickers, setStickers] = useState<Sticker[]>([]);
@@ -693,6 +895,40 @@ export default function App() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Create or update user profile document on login
+  useEffect(() => {
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    const displayName = user.displayName?.split(' ')[0] || 'Colecionador';
+    getDoc(userRef).then(snap => {
+      if (!snap.exists()) {
+        setDoc(userRef, {
+          uid: user.uid,
+          email: user.email || '',
+          displayName,
+          photoURL: user.photoURL || null,
+          totalOwned: 0,
+          totalDuplicates: 0,
+        });
+      } else {
+        updateDoc(userRef, {
+          email: user.email || '',
+          displayName,
+          photoURL: user.photoURL || null,
+        });
+      }
+    });
+  }, [user?.uid]);
+
+  // Sync sticker stats to user profile
+  useEffect(() => {
+    if (!user) return;
+    const totalOwned = stickers.length;
+    const totalDuplicates = stickers.reduce((acc, s) => acc + (s.count > 1 ? s.count - 1 : 0), 0);
+    const userRef = doc(db, 'users', user.uid);
+    updateDoc(userRef, { totalOwned, totalDuplicates }).catch(() => {});
+  }, [user?.uid, stickers]);
 
   const updateSticker = async (number: number, delta: number) => {
     if (!user) return;
@@ -882,6 +1118,19 @@ export default function App() {
                 <p className="text-white/60 text-sm">Mande números, fotos ou pergunte o que trocar.</p>
               </div>
               <AlfredoChat user={user} stickers={stickers} onUpdateBatch={updateBatch} />
+            </div>
+          </SectionWrapper>
+
+          {/* RANKING SECTION */}
+          <SectionWrapper id="ranking">
+            <div className="max-w-7xl mx-auto">
+              <div className="mb-8">
+                <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                  <Trophy className="text-gold" size={28} /> Ranking
+                </h2>
+                <p className="text-white/60 text-sm">Progresso de todos os participantes. Clique em "Sugerir troca" para ver o que você pode trocar com cada um.</p>
+              </div>
+              <RankingTab currentUser={user} currentUserStickers={stickers} />
             </div>
           </SectionWrapper>
 
