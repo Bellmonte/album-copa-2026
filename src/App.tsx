@@ -952,12 +952,25 @@ export default function App() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activePage, setActivePage] = useState<'home' | 'ranking'>('home');
+  const [activePage, setActivePage] = useState<'home' | 'ranking'>(
+    () => window.location.hash === '#ranking' ? 'ranking' : 'home'
+  );
 
   const handleNavigate = (page: 'home' | 'ranking') => {
+    window.location.hash = page === 'ranking' ? 'ranking' : '';
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const page = window.location.hash === '#ranking' ? 'ranking' : 'home';
+      setActivePage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
