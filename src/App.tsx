@@ -534,7 +534,7 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
           <div className="p-6 grid grid-cols-2 gap-4">
             <div>
               <div className="text-xs font-bold uppercase tracking-widest text-football-green mb-3 flex items-center gap-1.5">
-                <Plus size={12} /> Você pode dar ({iCanGive.length})
+                <Plus size={12} /> Suas repetidas para {otherUser.displayName} ({iCanGive.length})
               </div>
               {iCanGive.length === 0 ? (
                 <p className="text-white/30 text-xs">Nenhuma repetida que ele(a) precisa.</p>
@@ -548,7 +548,7 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-widest text-gold mb-3 flex items-center gap-1.5">
-                <Plus size={12} /> Você pode receber ({theyCanGive.length})
+                <Plus size={12} /> Repetidas de {otherUser.displayName} para você ({theyCanGive.length})
               </div>
               {theyCanGive.length === 0 ? (
                 <p className="text-white/30 text-xs">Ele(a) não tem repetidas que você precisa.</p>
