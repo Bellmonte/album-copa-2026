@@ -6,11 +6,11 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "The user ID of the owner." },
-        "number": { "type": "integer", "description": "The sticker number (1-980)." },
+        "code": { "type": "string", "description": "The sticker code in the format SIGLA-NN, for example BRA-01 or FWC-19." },
         "count": { "type": "integer", "description": "How many of this sticker the user has (1 = owned, >1 = duplicates)." },
         "updatedAt": { "type": "string", "format": "date-time", "description": "When the sticker was last updated." }
       },
-      "required": ["uid", "number", "count", "updatedAt"]
+      "required": ["uid", "code", "count", "updatedAt"]
     },
     "UserProfile": {
       "title": "UserProfile",

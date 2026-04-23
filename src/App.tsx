@@ -69,16 +69,100 @@ import {
 // Gemini
 import { GoogleGenAI, Type } from "@google/genai";
 
-const TOTAL_STICKERS = 980;
-
 // --- Types ---
 
 interface Sticker {
   id: string;
-  number: number;
+  code: string;
   count: number;
   updatedAt: Timestamp;
+  number?: number;
 }
+
+interface AlbumSection {
+  id: string;
+  label: string;
+  group?: string;
+  entries: AlbumEntry[];
+}
+
+interface AlbumEntry {
+  code: string;
+  sectionId: string;
+  sectionLabel: string;
+  group?: string;
+  order: number;
+  index: number;
+}
+
+const TEAM_GROUPS = [
+  { group: 'A', teams: ['MEX', 'RSA', 'KOR', 'CZE'] },
+  { group: 'B', teams: ['CAN', 'BIH', 'QAT', 'SUI'] },
+  { group: 'C', teams: ['BRA', 'MAR', 'HAI', 'SCO'] },
+  { group: 'D', teams: ['USA', 'PAR', 'AUS', 'TUR'] },
+  { group: 'E', teams: ['GER', 'CUW', 'CIV', 'ECU'] },
+  { group: 'F', teams: ['NED', 'JPN', 'SWE', 'TUN'] },
+  { group: 'G', teams: ['BEL', 'EGY', 'IRN', 'NZL'] },
+  { group: 'H', teams: ['ESP', 'CPV', 'KSA', 'URU'] },
+  { group: 'I', teams: ['FRA', 'SEN', 'IRQ', 'NOR'] },
+  { group: 'J', teams: ['ARG', 'ALG', 'AUT', 'JOR'] },
+  { group: 'K', teams: ['POR', 'COD', 'UZB', 'COL'] },
+  { group: 'L', teams: ['ENG', 'CRO', 'GHA', 'PAN'] },
+] as const;
+
+const createSectionEntries = (sectionId: string, limit: number, group?: string): AlbumEntry[] =>
+  Array.from({ length: limit }, (_, index) => ({
+    code: `${sectionId}-${String(index + 1).padStart(2, '0')}`,
+    sectionId,
+    sectionLabel: sectionId,
+    group,
+    order: index + 1,
+    index: index + 1,
+  }));
+
+const ALBUM_SECTIONS: AlbumSection[] = [
+  {
+    id: 'FWC',
+    label: 'FWC',
+    entries: createSectionEntries('FWC', 19),
+  },
+  {
+    id: 'CC',
+    label: 'CC',
+    entries: createSectionEntries('CC', 12),
+  },
+  ...TEAM_GROUPS.flatMap(({ group, teams }) =>
+    teams.map((team) => ({
+      id: team,
+      label: team,
+      group,
+      entries: createSectionEntries(team, 20, group),
+    }))
+  ),
+];
+
+const ALBUM_ENTRIES = ALBUM_SECTIONS.flatMap(section => section.entries);
+const TOTAL_STICKERS = ALBUM_ENTRIES.length;
+const ALBUM_ENTRY_MAP = new Map(ALBUM_ENTRIES.map(entry => [entry.code, entry]));
+const ALBUM_ORDER_MAP = new Map(ALBUM_ENTRIES.map((entry, index) => [entry.code, index]));
+const normalizeStickerCode = (value: string) => {
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '').replace(/_/g, '-');
+  const compact = normalized.replace(/-/g, '');
+  const match = compact.match(/^([A-Z]{2,3})(\d{1,2})$/);
+  if (match) {
+    return `${match[1]}-${match[2].padStart(2, '0')}`;
+  }
+  return normalized;
+};
+const getStickerCode = (sticker: Sticker) => normalizeStickerCode(sticker.code ?? String(sticker.number ?? ''));
+const compareStickerCodes = (a: string, b: string) => {
+  const left = ALBUM_ORDER_MAP.get(a);
+  const right = ALBUM_ORDER_MAP.get(b);
+  if (left != null && right != null) return left - right;
+  if (left != null) return -1;
+  if (right != null) return 1;
+  return a.localeCompare(b);
+};
 
 interface Message {
   role: 'user' | 'assistant';
@@ -342,22 +426,23 @@ const Navbar = ({ user, onError, activePage, onNavigate }: {
   );
 };
 
-const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (num: number, delta: number) => void }) => {
+const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (code: string, delta: number) => void }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState<'all' | 'owned' | 'missing' | 'duplicates'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const stickerMap = useMemo(() => {
-    const map = new Map<number, Sticker>();
-    stickers.forEach(s => map.set(s.number, s));
+    const map = new Map<string, Sticker>();
+    stickers.forEach(s => map.set(getStickerCode(s), s));
     return map;
   }, [stickers]);
 
-  const filteredNumbers = useMemo(() => {
-    const nums = Array.from({ length: TOTAL_STICKERS }, (_, i) => i + 1);
-    return nums.filter(n => {
-      const s = stickerMap.get(n);
-      const matchesSearch = searchQuery === '' || n.toString().includes(searchQuery);
+  const normalizedSearch = normalizeStickerCode(searchQuery);
+
+  const filteredEntries = useMemo(() => {
+    return ALBUM_ENTRIES.filter(entry => {
+      const s = stickerMap.get(entry.code);
+      const matchesSearch = normalizedSearch === '' || entry.code.includes(normalizedSearch) || entry.sectionId.includes(normalizedSearch);
       if (!matchesSearch) return false;
 
       if (filter === 'owned') return s && s.count > 0;
@@ -365,7 +450,7 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
       if (filter === 'duplicates') return s && s.count > 1;
       return true;
     });
-  }, [stickerMap, filter, searchQuery]);
+  }, [stickerMap, filter, normalizedSearch]);
 
   return (
     <div className="space-y-6">
@@ -387,10 +472,10 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={14} />
             <input 
               type="text" 
-              placeholder="Buscar número..." 
+              placeholder="Buscar código..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-10 py-2 text-xs focus:outline-none focus:border-football-green w-32 sm:w-48 transition-all"
+              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-10 py-2 text-xs focus:outline-none focus:border-football-green w-36 sm:w-52 transition-all"
             />
             {searchQuery && (
               <button 
@@ -409,7 +494,7 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
         </div>
       </div>
 
-      {filteredNumbers.length === 0 ? (
+      {filteredEntries.length === 0 ? (
         <div className="py-20 text-center glass-card rounded-3xl border-dashed border-white/10">
           <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
             <Search size={24} className="text-white/20" />
@@ -425,50 +510,75 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (n
           )}
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-20 lg:grid-cols-25 gap-1">
-          {filteredNumbers.map(n => {
-            const s = stickerMap.get(n);
-            const count = s?.count || 0;
+        <div className="space-y-6">
+          {ALBUM_SECTIONS.map(section => {
+            const sectionEntries = filteredEntries.filter(entry => entry.sectionId === section.id);
+            if (sectionEntries.length === 0) return null;
+
             return (
-              <button
-                key={n}
-                onClick={() => onUpdate(n, 1)}
-                onContextMenu={(e) => { e.preventDefault(); onUpdate(n, -1); }}
-                className={`aspect-square flex items-center justify-center text-[13px] font-bold rounded-sm transition-all relative group
-                  ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/20 hover:bg-white/10'}
-                  ${count > 1 ? 'ring-1 ring-gold' : ''}
-                `}
-              >
-                {n}
-                {count > 1 && (
-                  <span className="absolute -top-1 -right-1 bg-gold text-dark-bg text-[9px] w-2.5 h-2.5 rounded-full flex items-center justify-center">
-                    {count - 1}
+              <div key={section.id} className="glass-card rounded-2xl border border-white/10 p-4">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <div className="text-sm font-black tracking-wide text-white">{section.label}</div>
+                  {section.group && (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-football-green">
+                      Grupo {section.group}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                    {section.entries.length} figurinhas
                   </span>
-                )}
-              </button>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2">
+                  {sectionEntries.map(entry => {
+                    const s = stickerMap.get(entry.code);
+                    const count = s?.count || 0;
+                    return (
+                      <button
+                        key={entry.code}
+                        onClick={() => onUpdate(entry.code, 1)}
+                        onContextMenu={(e) => { e.preventDefault(); onUpdate(entry.code, -1); }}
+                        className={`min-h-14 px-2 py-2 flex flex-col items-center justify-center text-center rounded-lg transition-all relative
+                          ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}
+                          ${count > 1 ? 'ring-1 ring-gold' : ''}
+                        `}
+                      >
+                        <span className="text-[11px] font-black tracking-wide">{entry.sectionId}</span>
+                        <span className="text-sm font-bold">{String(entry.index).padStart(2, '0')}</span>
+                        {count > 1 && (
+                          <span className="absolute -top-1 -right-1 bg-gold text-dark-bg text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center">
+                            {count - 1}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredNumbers.map(n => {
-            const s = stickerMap.get(n);
+          {filteredEntries.map(entry => {
+            const s = stickerMap.get(entry.code);
             const count = s?.count || 0;
             return (
-              <div key={n} className="glass-card p-4 rounded-xl flex items-center justify-between">
+              <div key={entry.code} className="glass-card p-4 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/20'}`}>
-                    {n}
+                  <div className={`w-16 h-10 rounded-lg flex items-center justify-center font-bold text-xs ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/20'}`}>
+                    {entry.sectionId}
                   </div>
                   <div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-widest">{entry.code}{entry.group ? ` - Grupo ${entry.group}` : ''}</div>
                     <div className="text-sm font-bold">{count > 0 ? 'Adquirida' : 'Faltando'}</div>
                     <div className="text-[10px] text-white/40 uppercase tracking-widest">{count > 1 ? `${count - 1} repetida(s)` : 'Nenhuma repetida'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => onUpdate(n, -1)} className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-red-400 transition-colors"><Minus size={16} /></button>
+                  <button onClick={() => onUpdate(entry.code, -1)} className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-red-400 transition-colors"><Minus size={16} /></button>
                   <span className="w-4 text-center text-sm font-bold">{count}</span>
-                  <button onClick={() => onUpdate(n, 1)} className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-football-green transition-colors"><Plus size={16} /></button>
+                  <button onClick={() => onUpdate(entry.code, 1)} className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-football-green transition-colors"><Plus size={16} /></button>
                 </div>
               </div>
             );
@@ -491,7 +601,10 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
     const fetchStickers = async () => {
       const q = query(collection(db, 'stickers'), where('uid', '==', otherUser.uid));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Sticker));
+      const data = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as Sticker))
+        .filter(sticker => ALBUM_ENTRY_MAP.has(getStickerCode(sticker)))
+        .map(sticker => ({ ...sticker, code: getStickerCode(sticker) }));
       setTheirStickers(data);
       setLoading(false);
     };
@@ -499,13 +612,13 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
   }, [otherUser.uid]);
 
   const { iCanGive, theyCanGive } = useMemo(() => {
-    const myDuplicates = currentUserStickers.filter(s => s.count > 1).map(s => s.number);
-    const theirOwnedSet = new Set(theirStickers.map(s => s.number));
-    const myOwnedSet = new Set(currentUserStickers.map(s => s.number));
-    const theirDuplicates = theirStickers.filter(s => s.count > 1).map(s => s.number);
+    const myDuplicates = currentUserStickers.filter(s => s.count > 1).map(getStickerCode);
+    const theirOwnedSet = new Set(theirStickers.map(getStickerCode));
+    const myOwnedSet = new Set(currentUserStickers.map(getStickerCode));
+    const theirDuplicates = theirStickers.filter(s => s.count > 1).map(getStickerCode);
     return {
-      iCanGive: myDuplicates.filter(n => !theirOwnedSet.has(n)),
-      theyCanGive: theirDuplicates.filter(n => !myOwnedSet.has(n)),
+      iCanGive: myDuplicates.filter(n => !theirOwnedSet.has(n)).sort(compareStickerCodes),
+      theyCanGive: theirDuplicates.filter(n => !myOwnedSet.has(n)).sort(compareStickerCodes),
     };
   }, [currentUserStickers, theirStickers]);
 
@@ -567,9 +680,9 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
   );
 };
 
-const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: Sticker[], onUpdateBatch: (nums: number[], mode?: 'add' | 'remove') => void }) => {
+const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: Sticker[], onUpdateBatch: (codes: string[], mode?: 'add' | 'remove') => void }) => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Olá! Eu sou o Alfredo. Como posso te ajudar com seu álbum hoje? Você pode me mandar uma lista de números, ou me enviar uma foto das suas figurinhas!', timestamp: Date.now() }
+    { role: 'assistant', content: 'Olá! Eu sou o Alfredo. Como posso te ajudar com seu álbum hoje? Você pode me mandar uma lista de códigos, ou me enviar uma foto das suas figurinhas!', timestamp: Date.now() }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -605,7 +718,7 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
         timestamp: Date.now() 
       }]);
 
-      await handleSend("Analise esta foto de figurinhas da Copa do Mundo 2026 e extraia os números que você encontrar.", base64Data, file.type);
+      await handleSend("Analise esta foto de figurinhas da Copa do Mundo 2026 e extraia os códigos das figurinhas que você encontrar.", base64Data, file.type);
       setIsUploading(false);
     };
     reader.readAsDataURL(file);
@@ -631,21 +744,26 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
         The user has ${stickers.length} unique stickers out of ${TOTAL_STICKERS}.
         Total stickers: ${stickers.reduce((acc, s) => acc + s.count, 0)}.
         
-        Current stickers owned (numbers): ${stickers.map(s => s.number).join(', ')}.
+        Current stickers owned (codes): ${stickers.map(getStickerCode).join(', ')}.
+        Valid sticker sections:
+        - FWC-01 to FWC-19
+        - CC-01 to CC-12
+        - For each team code ${TEAM_GROUPS.flatMap(({ teams }) => teams).join(', ')}, use -01 to -20
         
         User message: "${textToSend}"
         
-        If an image is provided, perform OCR to find sticker numbers.
-        If the user provides sticker numbers to add, extract them.
+        If an image is provided, perform OCR to find sticker codes.
+        If the user provides sticker codes to add, extract them.
         If the user asks to remove stickers, extract them.
         If the user asks for status, provide it.
         If the user provides a list of a friend's stickers, compare with their missing ones.
+        Always normalize codes to the format SIGLA-NN.
         
         Return a JSON response with:
         {
           "reply": "Your friendly response in Portuguese",
           "action": "add" | "remove" | "status" | "match" | "none",
-          "numbers": [number] // stickers to add or remove or friend's stickers
+          "codes": [string] // stickers to add or remove or friend's stickers
         }
       ` }];
 
@@ -668,7 +786,7 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
             properties: {
               reply: { type: Type.STRING },
               action: { type: Type.STRING },
-              numbers: { type: Type.ARRAY, items: { type: Type.INTEGER } }
+              codes: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
             required: ["reply", "action"]
           }
@@ -678,10 +796,10 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
       const response = await model;
       const data = JSON.parse(response.text);
 
-      if (data.action === 'add' && data.numbers?.length > 0) {
-        onUpdateBatch(data.numbers, 'add');
-      } else if (data.action === 'remove' && data.numbers?.length > 0) {
-        onUpdateBatch(data.numbers, 'remove');
+      if (data.action === 'add' && data.codes?.length > 0) {
+        onUpdateBatch(data.codes.map(normalizeStickerCode), 'add');
+      } else if (data.action === 'remove' && data.codes?.length > 0) {
+        onUpdateBatch(data.codes.map(normalizeStickerCode), 'remove');
       }
 
       setMessages(prev => [...prev, { 
@@ -999,8 +1117,14 @@ export default function App() {
     const path = 'stickers';
     const q = query(collection(db, path), where('uid', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sticker));
-      setStickers(data.sort((a, b) => a.number - b.number));
+      const data = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Sticker))
+        .filter(sticker => {
+          const code = getStickerCode(sticker);
+          return Boolean(code) && ALBUM_ENTRY_MAP.has(code);
+        })
+        .map(sticker => ({ ...sticker, code: getStickerCode(sticker) }));
+      setStickers(data.sort((a, b) => compareStickerCodes(getStickerCode(a), getStickerCode(b))));
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, path);
       setError(err.message);
@@ -1043,9 +1167,11 @@ export default function App() {
     updateDoc(userRef, { totalOwned, totalDuplicates }).catch(() => {});
   }, [user?.uid, stickers]);
 
-  const updateSticker = async (number: number, delta: number) => {
+  const updateSticker = async (code: string, delta: number) => {
     if (!user) return;
-    const stickerId = `${user.uid}_${number}`;
+    const normalizedCode = normalizeStickerCode(code);
+    if (!ALBUM_ENTRY_MAP.has(normalizedCode)) return;
+    const stickerId = `${user.uid}_${normalizedCode}`;
     const path = `stickers/${stickerId}`;
     const stickerRef = doc(db, 'stickers', stickerId);
     
@@ -1056,19 +1182,19 @@ export default function App() {
         const newCount = Math.max(0, currentCount + delta);
         if (newCount === 0) {
           await deleteDoc(stickerRef);
-          toast.success(`Figurinha ${number} removida!`);
+          toast.success(`Figurinha ${normalizedCode} removida!`);
         } else {
           await updateDoc(stickerRef, { count: newCount, updatedAt: serverTimestamp() });
-          toast.success(`Figurinha ${number} atualizada (${newCount})!`);
+          toast.success(`Figurinha ${normalizedCode} atualizada (${newCount})!`);
         }
       } else if (delta > 0) {
         await setDoc(stickerRef, {
           uid: user.uid,
-          number,
+          code: normalizedCode,
           count: delta,
           updatedAt: serverTimestamp()
         });
-        toast.success(`Figurinha ${number} adicionada!`);
+        toast.success(`Figurinha ${normalizedCode} adicionada!`);
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
@@ -1076,13 +1202,18 @@ export default function App() {
     }
   };
 
-  const updateBatch = async (numbers: number[], mode: 'add' | 'remove' = 'add') => {
+  const updateBatch = async (codes: string[], mode: 'add' | 'remove' = 'add') => {
     if (!user) return;
     const batch = writeBatch(db);
+    const normalizedCodes = [...new Set(codes.map(normalizeStickerCode))].filter(code => ALBUM_ENTRY_MAP.has(code));
+    if (normalizedCodes.length === 0) {
+      toast.error('Nenhum código de figurinha válido foi encontrado.');
+      return;
+    }
     
     try {
-      for (const num of numbers) {
-        const stickerId = `${user.uid}_${num}`;
+      for (const code of normalizedCodes) {
+        const stickerId = `${user.uid}_${code}`;
         const stickerRef = doc(db, 'stickers', stickerId);
         const snap = await getDoc(stickerRef);
         
@@ -1092,7 +1223,7 @@ export default function App() {
           } else {
             batch.set(stickerRef, {
               uid: user.uid,
-              number: num,
+              code,
               count: 1,
               updatedAt: serverTimestamp()
             });
@@ -1109,7 +1240,7 @@ export default function App() {
         }
       }
       await batch.commit();
-      toast.success(`${numbers.length} figurinhas ${mode === 'add' ? 'adicionadas' : 'removidas'} com sucesso!`);
+      toast.success(`${normalizedCodes.length} figurinhas ${mode === 'add' ? 'adicionadas' : 'removidas'} com sucesso!`);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'stickers/batch');
       setError(err instanceof Error ? err.message : String(err));
@@ -1175,7 +1306,7 @@ export default function App() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Mande foto, fale os números ou digite — o Alfredo registra, organiza e te diz exatamente o que trocar.
+            Mande foto, informe os códigos ou digite: o Alfredo registra, organiza e te diz exatamente o que trocar.
           </p>
 
           {!user && (
@@ -1264,7 +1395,7 @@ export default function App() {
                   <div className="max-w-7xl mx-auto">
                     <div className="mb-8">
                       <h2 className="text-3xl font-bold mb-2">Fale com o Alfredo</h2>
-                      <p className="text-white/60 text-sm">Mande números, fotos ou pergunte o que trocar.</p>
+                      <p className="text-white/60 text-sm">Mande códigos, fotos ou pergunte o que trocar.</p>
                     </div>
                     <AlfredoChat user={user} stickers={stickers} onUpdateBatch={updateBatch} />
                   </div>

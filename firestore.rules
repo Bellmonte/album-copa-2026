@@ -29,9 +29,10 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidSticker(data) {
-      return data.keys().hasAll(['uid', 'number', 'count', 'updatedAt']) &&
+      return data.keys().hasAll(['uid', 'code', 'count', 'updatedAt']) &&
              data.uid == request.auth.uid &&
-             data.number is int && data.number >= 1 && data.number <= 980 &&
+             data.code is string &&
+             data.code.matches('^(FWC-(0[1-9]|1[0-9])|CC-(0[1-9]|1[0-2])|(MEX|RSA|KOR|CZE|CAN|BIH|QAT|SUI|BRA|MAR|HAI|SCO|USA|PAR|AUS|TUR|GER|CUW|CIV|ECU|NED|JPN|SWE|TUN|BEL|EGY|IRN|NZL|ESP|CPV|KSA|URU|FRA|SEN|IRQ|NOR|ARG|ALG|AUT|JOR|POR|COD|UZB|COL|ENG|CRO|GHA|PAN)-(0[1-9]|1[0-9]|20))$') &&
              data.count is int && data.count >= 0 &&
              data.updatedAt is timestamp;
     }
