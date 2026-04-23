@@ -142,6 +142,13 @@ const ALBUM_SECTIONS: AlbumSection[] = [
 ];
 
 const ALBUM_ENTRIES = ALBUM_SECTIONS.flatMap(section => section.entries);
+const SPECIAL_SECTIONS = ALBUM_SECTIONS.filter(section => !section.group);
+const GROUPED_TEAM_SECTIONS = TEAM_GROUPS.map(({ group, teams }) => ({
+  group,
+  sections: teams
+    .map(team => ALBUM_SECTIONS.find(section => section.id === team))
+    .filter((section): section is AlbumSection => Boolean(section)),
+}));
 const TOTAL_STICKERS = ALBUM_ENTRIES.length;
 const ALBUM_ENTRY_MAP = new Map(ALBUM_ENTRIES.map(entry => [entry.code, entry]));
 const ALBUM_ORDER_MAP = new Map(ALBUM_ENTRIES.map((entry, index) => [entry.code, index]));
@@ -523,26 +530,21 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
           )}
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="space-y-6">
-          {ALBUM_SECTIONS.map(section => {
+        <div className="space-y-8">
+          {SPECIAL_SECTIONS.map(section => {
             const sectionEntries = filteredEntries.filter(entry => entry.sectionId === section.id);
             if (sectionEntries.length === 0) return null;
 
             return (
-              <div key={section.id} className="glass-card rounded-2xl border border-white/10 p-4">
+              <div key={section.id} className="glass-card rounded-2xl border border-white/10 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <div className="text-sm font-black tracking-wide text-white">{section.label}</div>
-                  {section.group && (
-                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-football-green">
-                      Grupo {section.group}
-                    </span>
-                  )}
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">
                     {section.entries.length} figurinhas
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-2">
                   {sectionEntries.map(entry => {
                     const s = stickerMap.get(entry.code);
                     const count = s?.count || 0;
@@ -566,6 +568,70 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            );
+          })}
+
+          {GROUPED_TEAM_SECTIONS.map(({ group, sections }) => {
+            const visibleSections = sections
+              .map(section => ({
+                section,
+                entries: filteredEntries.filter(entry => entry.sectionId === section.id),
+              }))
+              .filter(({ entries }) => entries.length > 0);
+
+            if (visibleSections.length === 0) return null;
+
+            return (
+              <div key={group} className="glass-card rounded-3xl border border-white/10 p-4 sm:p-6">
+                <div className="flex flex-wrap items-center gap-3 mb-5">
+                  <div className="text-lg font-black tracking-wide text-white">Grupo {group}</div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-football-green">
+                    {visibleSections.length} seleções
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {visibleSections.map(({ section, entries }) => (
+                    <div key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="flex flex-wrap items-center gap-3 mb-4">
+                        <div className="text-base font-black tracking-wide text-white">{section.label}</div>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-football-green">
+                          Grupo {group}
+                        </span>
+                        <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                          {section.entries.length} figurinhas
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                        {entries.map(entry => {
+                          const s = stickerMap.get(entry.code);
+                          const count = s?.count || 0;
+                          return (
+                            <button
+                              key={entry.code}
+                              onClick={() => onUpdate(entry.code, 1)}
+                              onContextMenu={(e) => { e.preventDefault(); onUpdate(entry.code, -1); }}
+                              className={`min-h-14 px-2 py-2 flex flex-col items-center justify-center text-center rounded-lg transition-all relative
+                                ${count > 0 ? 'bg-football-green text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}
+                                ${count > 1 ? 'ring-1 ring-gold' : ''}
+                              `}
+                            >
+                              <span className="text-[11px] font-black tracking-wide">{entry.sectionId}</span>
+                              <span className="text-sm font-bold">{String(entry.index).padStart(2, '0')}</span>
+                              {count > 1 && (
+                                <span className="absolute -top-1 -right-1 bg-gold text-dark-bg text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center">
+                                  {count - 1}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
