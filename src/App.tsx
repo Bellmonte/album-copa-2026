@@ -293,11 +293,12 @@ const SectionWrapper = ({ children, id, className = "" }: { children: React.Reac
   );
 };
 
-const Navbar = ({ user, onError, activePage, onNavigate }: {
+const Navbar = ({ user, onError, activePage, onNavigate, onOpenChat }: {
   user: User | null;
   onError: (err: string) => void;
   activePage: 'home' | 'ranking';
   onNavigate: (page: 'home' | 'ranking') => void;
+  onOpenChat: () => void;
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -341,11 +342,16 @@ const Navbar = ({ user, onError, activePage, onNavigate }: {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
-          {user && activePage === 'home' && homeLinks.map((link) => (
-            <a key={link.name} href={link.href} className="text-sm font-medium text-white/70 hover:text-football-green transition-colors">
-              {link.name}
-            </a>
-          ))}
+          {user && activePage === 'home' && (
+            <>
+              <a href="#album" className="text-sm font-medium text-white/70 hover:text-football-green transition-colors">
+                Meu Álbum
+              </a>
+              <button onClick={onOpenChat} className="text-sm font-medium text-white/70 hover:text-football-green transition-colors">
+                Alfredo Chat
+              </button>
+            </>
+          )}
           {user && (
             <button
               onClick={() => onNavigate(activePage === 'ranking' ? 'home' : 'ranking')}
@@ -391,16 +397,23 @@ const Navbar = ({ user, onError, activePage, onNavigate }: {
             className="md:hidden bg-dark-bg border-b border-white/10 overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4">
-              {user && activePage === 'home' && homeLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="text-lg font-medium text-white/70"
-                >
-                  {link.name}
-                </a>
-              ))}
+              {user && activePage === 'home' && (
+                <>
+                  <a
+                    href="#album"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="text-lg font-medium text-white/70"
+                  >
+                    Meu Álbum
+                  </a>
+                  <button
+                    onClick={() => { onOpenChat(); setIsMobileMenuOpen(false); }}
+                    className="text-left text-lg font-medium text-white/70"
+                  >
+                    Alfredo Chat
+                  </button>
+                </>
+              )}
               {user && (
                 <button
                   onClick={() => { onNavigate(activePage === 'ranking' ? 'home' : 'ranking'); setIsMobileMenuOpen(false); }}
@@ -680,7 +693,12 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
   );
 };
 
-const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: Sticker[], onUpdateBatch: (codes: string[], mode?: 'add' | 'remove') => void }) => {
+const AlfredoChat = ({ user, stickers, onUpdateBatch, className = "h-[600px]" }: {
+  user: User,
+  stickers: Sticker[],
+  onUpdateBatch: (codes: string[], mode?: 'add' | 'remove') => void,
+  className?: string
+}) => {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Olá! Eu sou o Alfredo. Como posso te ajudar com seu álbum hoje? Você pode me mandar uma lista de códigos, ou me enviar uma foto das suas figurinhas!', timestamp: Date.now() }
   ]);
@@ -816,7 +834,7 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch }: { user: User, stickers: 
   };
 
   return (
-    <div className="glass-card rounded-3xl overflow-hidden flex flex-col h-[600px] border border-white/10 shadow-2xl">
+    <div className={`glass-card rounded-3xl overflow-hidden flex flex-col border border-white/10 shadow-2xl ${className}`}>
       <div className="bg-white/5 p-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-football-green rounded-full flex items-center justify-center">
@@ -1070,6 +1088,7 @@ export default function App() {
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [activePage, setActivePage] = useState<'home' | 'ranking'>(
     () => window.location.hash === '#ranking' ? 'ranking' : 'home'
   );
@@ -1279,7 +1298,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen selection:bg-football-green/30">
-      <Navbar user={user} onError={setError} activePage={activePage} onNavigate={handleNavigate} />
+      <Navbar
+        user={user}
+        onError={setError}
+        activePage={activePage}
+        onNavigate={handleNavigate}
+        onOpenChat={() => setIsChatOpen(true)}
+      />
       <ErrorBoundary error={error} />
       <Toaster position="top-center" richColors theme="dark" />
 
@@ -1390,17 +1415,6 @@ export default function App() {
                 exit={{ opacity: 0, x: -40 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* CHAT SECTION */}
-                <SectionWrapper id="chat">
-                  <div className="max-w-7xl mx-auto">
-                    <div className="mb-8">
-                      <h2 className="text-3xl font-bold mb-2">Fale com o Alfredo</h2>
-                      <p className="text-white/60 text-sm">Mande códigos, fotos ou pergunte o que trocar.</p>
-                    </div>
-                    <AlfredoChat user={user} stickers={stickers} onUpdateBatch={updateBatch} />
-                  </div>
-                </SectionWrapper>
-
                 {/* ALBUM SECTION */}
                 <SectionWrapper id="album" className="bg-white/[0.02]">
                   <div className="max-w-7xl mx-auto">
@@ -1422,6 +1436,58 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {activePage === 'home' && (
+            <>
+              <AnimatePresence>
+                {isChatOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 24, scale: 0.96 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="fixed bottom-24 right-4 z-[120] w-[calc(100vw-2rem)] max-w-[420px] md:right-6"
+                  >
+                    <div className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-dark-bg/90 px-4 py-3 backdrop-blur-xl shadow-2xl">
+                      <div>
+                        <div className="text-sm font-bold text-white">Fale com o Alfredo</div>
+                        <div className="text-[10px] uppercase tracking-widest text-white/40">Códigos, fotos e trocas</div>
+                      </div>
+                      <button
+                        onClick={() => setIsChatOpen(false)}
+                        className="rounded-lg p-2 text-white/40 transition-colors hover:bg-white/5 hover:text-white"
+                        aria-label="Fechar chat"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <AlfredoChat
+                      user={user}
+                      stickers={stickers}
+                      onUpdateBatch={updateBatch}
+                      className="h-[min(70vh,640px)]"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setIsChatOpen(open => !open)}
+                className="fixed bottom-6 right-4 z-[110] flex items-center gap-3 rounded-full border border-football-green/40 bg-football-green px-4 py-3 text-white shadow-[0_18px_45px_rgba(22,163,74,0.35)] transition-all hover:bg-football-green/90 md:right-6"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+                  {isChatOpen ? <X size={20} /> : <MessageSquare size={20} />}
+                </div>
+                <div className="hidden text-left sm:block">
+                  <div className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Assistente</div>
+                  <div className="text-sm font-bold">Fale com o Alfredo</div>
+                </div>
+              </motion.button>
+            </>
+          )}
         </>
       ) : null}
 
