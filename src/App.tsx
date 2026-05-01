@@ -1249,7 +1249,9 @@ export default function App() {
     const totalOwned = stickers.length;
     const totalDuplicates = stickers.reduce((acc, s) => acc + (s.count > 1 ? s.count - 1 : 0), 0);
     const userRef = doc(db, 'users', user.uid);
-    updateDoc(userRef, { totalOwned, totalDuplicates }).catch(() => {});
+    updateDoc(userRef, { totalOwned, totalDuplicates }).catch(err => {
+      console.error('[sync user totals] failed:', err);
+    });
   }, [user?.uid, stickers]);
 
   const updateSticker = async (code: string, delta: number) => {
