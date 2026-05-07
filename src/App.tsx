@@ -122,11 +122,11 @@ const createSectionEntries = (sectionId: string, limit: number, group?: string):
 
 const ALBUM_SECTIONS: AlbumSection[] = [
   {
-    id: 'ESP',
+    id: 'TRO',
     label: 'Especial',
     entries: [{
-      code: 'ESP-00',
-      sectionId: 'ESP',
+      code: 'TRO-00',
+      sectionId: 'TRO',
       sectionLabel: 'Especial',
       order: 0,
       index: 0,
@@ -841,7 +841,7 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch, className = "h-[600px]" }:
         
         Current stickers owned (codes): ${stickers.map(getStickerCode).join(', ')}.
         Valid sticker sections:
-        - ESP-00 (special trophy/cover sticker)
+        - TRO-00 (special trophy/cover sticker)
         - FWC-01 to FWC-19
         - CC-01 to CC-14
         - For each team code ${TEAM_GROUPS.flatMap(({ teams }) => teams).join(', ')}, use -01 to -20
