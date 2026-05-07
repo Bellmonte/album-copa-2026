@@ -1,4 +1,4 @@
-const CACHE_NAME = 'album-copa-2026-v1';
+const CACHE_NAME = 'album-copa-2026-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-maskable.svg'];
 
 self.addEventListener('install', (event) => {
