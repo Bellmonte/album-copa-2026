@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="60%" stop-color="#16a34a"/>
+      <stop offset="100%" stop-color="#0a3d1f"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </radialGradient>
+    <linearGradient id="sticker" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="6" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)" transform="translate(96 88) rotate(-8 160 192)">
+    <rect width="320" height="384" rx="24" ry="24" fill="url(#sticker)" stroke="#f59e0b" stroke-width="6"/>
+    <rect x="14" y="14" width="292" height="356" rx="16" ry="16" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 6"/>
+
+    <g transform="translate(160 168)">
+      <circle r="92" fill="url(#ball)" stroke="#1a1a2e" stroke-width="5"/>
+      <g fill="#1a1a2e">
+        <polygon points="0,-50 23,-34 14,-7 -14,-7 -23,-34"/>
+        <polygon points="-44,-22 -21,-7 -28,18 -52,16 -60,-9"/>
+        <polygon points="44,-22 60,-9 52,16 28,18 21,-7"/>
+        <polygon points="-14,8 14,8 23,34 0,50 -23,34"/>
+      </g>
+      <g fill="none" stroke="#1a1a2e" stroke-width="4" stroke-linecap="round">
+        <line x1="0" y1="-50" x2="0" y2="-78"/>
+        <line x1="-23" y1="-34" x2="-44" y2="-50"/>
+        <line x1="23" y1="-34" x2="44" y2="-50"/>
+        <line x1="-52" y1="16" x2="-78" y2="22"/>
+        <line x1="52" y1="16" x2="78" y2="22"/>
+        <line x1="-23" y1="34" x2="-36" y2="60"/>
+        <line x1="23" y1="34" x2="36" y2="60"/>
+      </g>
+    </g>
+
+    <text x="160" y="312" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="44" fill="#16a34a" letter-spacing="2">COPA 26</text>
+  </g>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="60%" stop-color="#16a34a"/>
+      <stop offset="100%" stop-color="#0a3d1f"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </radialGradient>
+    <linearGradient id="sticker" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <g transform="translate(146 152)">
+    <rect width="220" height="264" rx="18" ry="18" fill="url(#sticker)" stroke="#f59e0b" stroke-width="5"/>
+    <rect x="10" y="10" width="200" height="244" rx="12" ry="12" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5 5"/>
+
+    <g transform="translate(110 116)">
+      <circle r="62" fill="url(#ball)" stroke="#1a1a2e" stroke-width="4"/>
+      <g fill="#1a1a2e">
+        <polygon points="0,-34 16,-23 10,-5 -10,-5 -16,-23"/>
+        <polygon points="-30,-15 -14,-5 -19,12 -35,11 -41,-6"/>
+        <polygon points="30,-15 41,-6 35,11 19,12 14,-5"/>
+        <polygon points="-10,5 10,5 16,23 0,34 -16,23"/>
+      </g>
+    </g>
+
+    <text x="110" y="220" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="30" fill="#16a34a" letter-spacing="1.5">COPA 26</text>
+  </g>
+</svg>

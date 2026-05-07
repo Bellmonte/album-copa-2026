@@ -122,6 +122,17 @@ const createSectionEntries = (sectionId: string, limit: number, group?: string):
 
 const ALBUM_SECTIONS: AlbumSection[] = [
   {
+    id: 'ESP',
+    label: 'Especial',
+    entries: [{
+      code: 'ESP-00',
+      sectionId: 'ESP',
+      sectionLabel: 'Especial',
+      order: 0,
+      index: 0,
+    }],
+  },
+  {
     id: 'FWC',
     label: 'FWC',
     entries: createSectionEntries('FWC', 19),
@@ -129,7 +140,7 @@ const ALBUM_SECTIONS: AlbumSection[] = [
   {
     id: 'CC',
     label: 'CC',
-    entries: createSectionEntries('CC', 12),
+    entries: createSectionEntries('CC', 14),
   },
   ...TEAM_GROUPS.flatMap(({ group, teams }) =>
     teams.map((team) => ({
@@ -830,8 +841,9 @@ const AlfredoChat = ({ user, stickers, onUpdateBatch, className = "h-[600px]" }:
         
         Current stickers owned (codes): ${stickers.map(getStickerCode).join(', ')}.
         Valid sticker sections:
+        - ESP-00 (special trophy/cover sticker)
         - FWC-01 to FWC-19
-        - CC-01 to CC-12
+        - CC-01 to CC-14
         - For each team code ${TEAM_GROUPS.flatMap(({ teams }) => teams).join(', ')}, use -01 to -20
         
         User message: "${textToSend}"
