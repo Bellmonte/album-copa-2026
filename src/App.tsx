@@ -1068,15 +1068,17 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
   const isAdmin = currentUser.email === ADMIN_EMAIL;
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const snapshot = await getDocs(collection(db, 'users'));
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const data = snapshot.docs
         .map(d => d.data() as UserProfile)
         .sort((a, b) => b.totalOwned - a.totalOwned);
       setUsers(data);
       setLoading(false);
-    };
-    fetchUsers();
+    }, (err) => {
+      console.error('[ranking subscription] failed:', err);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const toggleHidden = async (u: UserProfile) => {
@@ -1217,6 +1219,8 @@ const RankingTab = ({ currentUser, currentUserStickers }: {
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [stickers, setStickers] = useState<Sticker[]>([]);
+  const [stickersLoaded, setStickersLoaded] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -1261,9 +1265,11 @@ export default function App() {
   useEffect(() => {
     if (!user) {
       setStickers([]);
+      setStickersLoaded(false);
       return;
     }
 
+    setStickersLoaded(false);
     const path = 'stickers';
     const q = query(collection(db, path), where('uid', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1275,6 +1281,7 @@ export default function App() {
         })
         .map(sticker => ({ ...sticker, code: getStickerCode(sticker) }));
       setStickers(data.sort((a, b) => compareStickerCodes(getStickerCode(a), getStickerCode(b))));
+      setStickersLoaded(true);
     }, (err) => {
       handleFirestoreError(err, OperationType.GET, path);
       setError(err.message);
@@ -1285,39 +1292,58 @@ export default function App() {
 
   // Create or update user profile document on login
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfileReady(false);
+      return;
+    }
+    setProfileReady(false);
     const userRef = doc(db, 'users', user.uid);
     const displayName = user.displayName?.split(' ')[0] || 'Colecionador';
-    getDoc(userRef).then(snap => {
-      if (!snap.exists()) {
-        setDoc(userRef, {
-          uid: user.uid,
-          email: user.email || '',
-          displayName,
-          photoURL: user.photoURL || null,
-          totalOwned: 0,
-          totalDuplicates: 0,
-        });
-      } else {
-        updateDoc(userRef, {
-          email: user.email || '',
-          displayName,
-          photoURL: user.photoURL || null,
-        });
+    (async () => {
+      try {
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email || '',
+            displayName,
+            photoURL: user.photoURL || null,
+            totalOwned: 0,
+            totalDuplicates: 0,
+          });
+        } else {
+          const existing = snap.data();
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email || '',
+            displayName,
+            photoURL: user.photoURL || null,
+            totalOwned: typeof existing.totalOwned === 'number' ? existing.totalOwned : 0,
+            totalDuplicates: typeof existing.totalDuplicates === 'number' ? existing.totalDuplicates : 0,
+            ...(existing.hidden !== undefined ? { hidden: existing.hidden } : {}),
+            ...(existing.banned !== undefined ? { banned: existing.banned } : {}),
+            ...(existing.role !== undefined ? { role: existing.role } : {}),
+          }, { merge: true });
+        }
+        setProfileReady(true);
+      } catch (err) {
+        console.error('[profile setup] failed:', err);
+        toast.error('Não foi possível sincronizar seu perfil. Tente recarregar a página.');
       }
-    });
+    })();
   }, [user?.uid]);
 
-  // Sync sticker stats to user profile
+  // Sync sticker stats to user profile — only after both profile exists AND stickers have loaded.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !stickersLoaded || !profileReady) return;
     const totalOwned = stickers.length;
     const totalDuplicates = stickers.reduce((acc, s) => acc + (s.count > 1 ? s.count - 1 : 0), 0);
     const userRef = doc(db, 'users', user.uid);
     updateDoc(userRef, { totalOwned, totalDuplicates }).catch(err => {
       console.error('[sync user totals] failed:', err);
+      toast.error('Falha ao sincronizar seu progresso no ranking.');
     });
-  }, [user?.uid, stickers]);
+  }, [user?.uid, stickers, stickersLoaded, profileReady]);
 
   const updateSticker = async (code: string, delta: number) => {
     if (!user) return;
