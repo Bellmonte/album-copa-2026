@@ -546,12 +546,22 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
             const sectionEntries = filteredEntries.filter(entry => entry.sectionId === section.id);
             if (sectionEntries.length === 0) return null;
 
+            let coladas = 0;
+            let repetidas = 0;
+            section.entries.forEach(entry => {
+              const s = stickerMap.get(entry.code);
+              if (s && s.count >= 1) coladas++;
+              if (s && s.count > 1) repetidas += s.count - 1;
+            });
+
             return (
               <div key={section.id} className="glass-card rounded-2xl border border-white/10 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <div className="text-sm font-black tracking-wide text-white">{section.label}</div>
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">
-                    {section.entries.length} figurinhas
+                    <span className="text-football-green">{coladas}</span>/{section.entries.length} coladas
+                    <span className="mx-1.5 text-white/20">·</span>
+                    <span className={repetidas > 0 ? 'text-gold' : ''}>{repetidas}</span> repetidas
                   </span>
                 </div>
 
@@ -604,7 +614,15 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {visibleSections.map(({ section, entries }) => (
+                  {visibleSections.map(({ section, entries }) => {
+                    let coladas = 0;
+                    let repetidas = 0;
+                    section.entries.forEach(entry => {
+                      const s = stickerMap.get(entry.code);
+                      if (s && s.count >= 1) coladas++;
+                      if (s && s.count > 1) repetidas += s.count - 1;
+                    });
+                    return (
                     <div key={section.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="flex flex-wrap items-center gap-3 mb-4">
                         <div className="text-base font-black tracking-wide text-white">{section.label}</div>
@@ -612,7 +630,9 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
                           Grupo {group}
                         </span>
                         <span className="text-[10px] text-white/40 uppercase tracking-widest">
-                          {section.entries.length} figurinhas
+                          <span className="text-football-green">{coladas}</span>/{section.entries.length} coladas
+                          <span className="mx-1.5 text-white/20">·</span>
+                          <span className={repetidas > 0 ? 'text-gold' : ''}>{repetidas}</span> repetidas
                         </span>
                       </div>
 
@@ -642,7 +662,8 @@ const StickerGrid = ({ stickers, onUpdate }: { stickers: Sticker[], onUpdate: (c
                         })}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -712,6 +733,24 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
     };
   }, [currentUserStickers, theirStickers]);
 
+  const groupCodes = (codes: string[]) => {
+    const buckets = new Map<string, { label: string; codes: string[]; sortKey: string }>();
+    codes.forEach(code => {
+      const entry = ALBUM_ENTRY_MAP.get(code);
+      const group = entry?.group;
+      const sectionId = entry?.sectionId ?? '·';
+      const key = group ?? sectionId;
+      const label = group ? `Grupo ${group}` : sectionId;
+      const sortKey = group ? `2-${group}` : `1-${sectionId}`;
+      if (!buckets.has(key)) buckets.set(key, { label, codes: [], sortKey });
+      buckets.get(key)!.codes.push(code);
+    });
+    return Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  };
+
+  const iCanGiveGrouped = useMemo(() => groupCodes(iCanGive), [iCanGive]);
+  const theyCanGiveGrouped = useMemo(() => groupCodes(theyCanGive), [theyCanGive]);
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[#1a1f2e] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -742,9 +781,16 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
               {iCanGive.length === 0 ? (
                 <p className="text-white/30 text-xs">Nenhuma repetida que ele(a) precisa.</p>
               ) : (
-                <div className="flex flex-wrap gap-1">
-                  {iCanGive.map(n => (
-                    <span key={n} className="bg-football-green/20 text-football-green text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                <div className="space-y-2">
+                  {iCanGiveGrouped.map(({ label, codes }) => (
+                    <div key={label}>
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-1">{label}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {codes.map(n => (
+                          <span key={n} className="bg-football-green/20 text-football-green text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -756,9 +802,16 @@ const TradeModal = ({ currentUserStickers, otherUser, onClose }: {
               {theyCanGive.length === 0 ? (
                 <p className="text-white/30 text-xs">Ele(a) não tem repetidas que você precisa.</p>
               ) : (
-                <div className="flex flex-wrap gap-1">
-                  {theyCanGive.map(n => (
-                    <span key={n} className="bg-gold/20 text-gold text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                <div className="space-y-2">
+                  {theyCanGiveGrouped.map(({ label, codes }) => (
+                    <div key={label}>
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-1">{label}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {codes.map(n => (
+                          <span key={n} className="bg-gold/20 text-gold text-[11px] font-bold px-2 py-0.5 rounded-md">{n}</span>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
